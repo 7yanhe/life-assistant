@@ -22,8 +22,11 @@
       <a href="#/account/daily" data-nav="account">记账</a>
     </div>
     <div class="nav-actions">
-      <button type="button" class="btn btn-small" data-action="export-backup">导出备份</button>
-      <button type="button" class="btn btn-small" data-action="import-backup">导入恢复</button>
+      <button type="button" class="btn btn-icon more-btn" data-action="nav-more" aria-label="更多操作">⋮</button>
+      <div class="nav-more-menu" data-role="nav-more-menu" hidden>
+        <button type="button" class="menu-item" data-action="export-backup">导出备份</button>
+        <button type="button" class="menu-item" data-action="import-backup">导入恢复</button>
+      </div>
       <input type="file" id="import-file" accept=".json,application/json" hidden>
     </div>
   </nav>

@@ -40,8 +40,10 @@ test('页面启动：脚本按序加载、main.js 引导成功并渲染首页', 
   assert.deepStrictEqual(errors, [], '不应有脚本执行错误');
   const appEl = doc.getElementById('app');
   assert.ok(appEl.innerHTML.length > 100, '首页应完成渲染');
-  assert.match(appEl.innerHTML, /今日打卡/, '首页应包含今日打卡卡片');
-  assert.match(appEl.innerHTML, /今日记账/, '首页应包含今日记账卡片');
+  assert.match(appEl.innerHTML, /cal-grid/, '首页应包含日历网格');
+  assert.match(appEl.innerHTML, /home-detail/, '首页应包含详情区域');
+  assert.match(appEl.innerHTML, /📋 打卡/, '首页应包含打卡区域');
+  assert.match(appEl.innerHTML, /💰 记账/, '首页应包含记账区域');
   assert.ok(doc.querySelector('nav a[data-nav="home"]'), '导航应渲染');
   win.close();
 });

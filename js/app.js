@@ -38,7 +38,11 @@
       detailMonth: null,
       detailPlanId: null,
       accountDate: null,
-      statsPeriod: 'month'
+      statsPeriod: 'month',
+      homeMonth: null,
+      homeSelectedDate: null,
+      editingExpenseId: null,
+      editingIncomeId: null
     };
   }
 
@@ -168,12 +172,32 @@
         self._stopExpense(el); break;
       case 'delete-expense':
         self._deleteExpense(el); break;
+      case 'expense-name-edit':
+        self.state.editingExpenseId = el.getAttribute('data-id');
+        self.render(); break;
+      case 'expense-name-save':
+        self._saveExpenseName(el); break;
+      case 'expense-name-cancel':
+        self.state.editingExpenseId = null;
+        self.render(); break;
+      case 'expense-more':
+        self._expenseMore(el); break;
       case 'add-income':
         self._addIncome(); break;
       case 'edit-income':
         self._editIncome(el); break;
       case 'delete-income':
         self._deleteIncome(el); break;
+      case 'income-name-edit':
+        self.state.editingIncomeId = el.getAttribute('data-id');
+        self.render(); break;
+      case 'income-edit-save':
+        self._saveIncomeEdit(el); break;
+      case 'income-edit-cancel':
+        self.state.editingIncomeId = null;
+        self.render(); break;
+      case 'income-more':
+        self._incomeMore(el); break;
       case 'period-week':
       case 'period-month':
       case 'period-quarter':
@@ -184,6 +208,23 @@
         self._exportBackup(); break;
       case 'import-backup':
         self._openImport(); break;
+      case 'home-month-prev':
+        self.state.homeMonth = monthAdd(self.state.homeMonth || self.store.todayFn().slice(0, 7), -1);
+        self.render(); break;
+      case 'home-month-next':
+        self.state.homeMonth = monthAdd(self.state.homeMonth || self.store.todayFn().slice(0, 7), 1);
+        self.render(); break;
+      case 'home-today':
+        self.state.homeMonth = self.store.todayFn().slice(0, 7);
+        self.state.homeSelectedDate = self.store.todayFn();
+        self.render(); break;
+      case 'home-date-select':
+        self.state.homeSelectedDate = el.getAttribute('data-date');
+        self.render(); break;
+      case 'home-quick-add':
+        self._quickAdd(); break;
+      case 'nav-more':
+        self._toggleNavMore(); break;
       default:
         break;
     }
@@ -239,10 +280,16 @@
 
   App.prototype._renderHome = function () {
     var today = this.store.todayFn();
+    var month = this.state.homeMonth || today.slice(0, 7);
+    var selected = this.state.homeSelectedDate || today;
+    var calendar = this.store.monthCalendarSummary(month);
     var items = this.store.listPlansWithStatus();
-    var summary = this.store.dailySummary(today);
+    var summary = this.store.dailySummary(selected);
     return HomeView.render({
       today: today,
+      month: month,
+      selectedDate: selected,
+      calendar: calendar,
       plans: items.map(function (it) {
         return { id: it.plan.id, name: it.plan.name, completedToday: it.completedToday };
       }),
@@ -296,6 +343,8 @@
     var summary = this.store.dailySummary(date);
     return AccountDailyView.render({
       date: date,
+      editingExpenseId: this.state.editingExpenseId,
+      editingIncomeId: this.state.editingIncomeId,
       summary: {
         expenseRows: summary.expenseRows.map(function (r) {
           return { item: { id: r.item.id, name: r.item.name }, amount: r.amount };
@@ -440,6 +489,40 @@
     });
   };
 
+  App.prototype._saveExpenseName = function (el) {
+    var id = el.getAttribute('data-id');
+    var input = this.root.querySelector('input[data-action="expense-name-input"][data-id="' + id + '"]');
+    var name = input ? input.value : '';
+    var r = this.store.renameExpenseItem(id, name);
+    if (!r.ok) { UI.toast(friendly(r.reason), 'error'); return; }
+    this.state.editingExpenseId = null;
+    this.render();
+    UI.toast('已修改名称', 'success');
+  };
+
+  App.prototype._expenseMore = function (el) {
+    var self = this;
+    var id = el.getAttribute('data-id');
+    var item = this.store.getExpenseItem(id);
+    if (!item) return;
+    UI.promptFields('「' + item.name + '」操作', [
+      { label: '选择操作：1=重命名 2=停止记录 3=删除', value: '1', placeholder: '输入数字' }
+    ]).then(function (res) {
+      if (!res) return;
+      var choice = res.values[0].trim();
+      if (choice === '1') {
+        self.state.editingExpenseId = id;
+        self.render();
+      } else if (choice === '2') {
+        self._stopExpense(el);
+      } else if (choice === '3') {
+        self._deleteExpense(el);
+      } else {
+        UI.toast('请输入 1、2 或 3', 'error');
+      }
+    });
+  };
+
   App.prototype._addIncome = function () {
     var self = this;
     var nameEl = this.root.querySelector('#inc-name');
@@ -478,6 +561,75 @@
       self.render();
       UI.toast('已删除收入', 'success');
     });
+  };
+
+  App.prototype._saveIncomeEdit = function (el) {
+    var id = el.getAttribute('data-id');
+    var nameInput = this.root.querySelector('input[data-action="income-name-input"][data-id="' + id + '"]');
+    var amountInput = this.root.querySelector('input[data-action="income-amount-input"][data-id="' + id + '"]');
+    var name = nameInput ? nameInput.value : '';
+    var amount = amountInput ? amountInput.value : '';
+    var r = this.store.updateIncome(id, { name: name, amount: amount });
+    if (!r.ok) { UI.toast(friendly(r.reason), 'error'); return; }
+    this.state.editingIncomeId = null;
+    this.render();
+    UI.toast('已保存修改', 'success');
+  };
+
+  App.prototype._incomeMore = function (el) {
+    var self = this;
+    var id = el.getAttribute('data-id');
+    var rec = this.store.getIncome(id);
+    if (!rec) return;
+    UI.promptFields('「' + rec.name + '」操作', [
+      { label: '选择操作：1=编辑 2=删除', value: '1', placeholder: '输入数字' }
+    ]).then(function (res) {
+      if (!res) return;
+      var choice = res.values[0].trim();
+      if (choice === '1') {
+        self.state.editingIncomeId = id;
+        self.render();
+      } else if (choice === '2') {
+        self._deleteIncome(el);
+      } else {
+        UI.toast('请输入 1 或 2', 'error');
+      }
+    });
+  };
+
+  App.prototype._quickAdd = function () {
+    var self = this;
+    UI.promptFields('快速添加', [
+      { label: '类型', value: '支出项目', placeholder: '支出项目/打卡计划/收入' }
+    ]).then(function (res) {
+      if (!res) return;
+      var type = res.values[0].trim();
+      if (type.indexOf('支出') >= 0) {
+        self._addExpense();
+      } else if (type.indexOf('打卡') >= 0) {
+        self._createPlan();
+      } else if (type.indexOf('收入') >= 0) {
+        if (self.win) self.win.location.hash = '#/account/daily';
+      } else {
+        UI.toast('请输入：支出项目、打卡计划 或 收入', 'error');
+      }
+    });
+  };
+
+
+  App.prototype._toggleNavMore = function () {
+    var menu = this.doc.querySelector('[data-role="nav-more-menu"]');
+    if (!menu) return;
+    if (menu.hasAttribute('hidden')) {
+      menu.removeAttribute('hidden');
+    } else {
+      menu.setAttribute('hidden', '');
+    }
+  };
+
+  App.prototype._closeNavMore = function () {
+    var menu = this.doc.querySelector('[data-role="nav-more-menu"]');
+    if (menu) menu.setAttribute('hidden', '');
   };
 
   App.prototype._exportBackup = function () {

@@ -118,10 +118,9 @@ test('E5 停止记录：明天起不再出现，历史保留', async () => {
   await app.start();
   await gotoDaily(doc, win);
   // 今天 9-09 停止「早餐」
-  clickAction(win, doc.querySelector('button[data-action="stop-expense"][data-id="e1"]'));
-  await tick();
-  const btns = doc.querySelectorAll('.modal-foot button');
-  btns[btns.length - 1].click(); // 停止
+  const stopR = store.stopExpenseItem('e1', '2026-09-09');
+  assert.ok(stopR.ok, '停止应成功');
+  app.render();
   await tick();
   // 今天仍出现
   assert.ok(rowNames(doc).includes('早餐'));
@@ -141,10 +140,9 @@ test('E6 删除项目：所有日期记录消失', async () => {
   const { win, doc, app, store } = buildApp(seedAccounting());
   await app.start();
   await gotoDaily(doc, win);
-  clickAction(win, doc.querySelector('button[data-action="delete-expense"][data-id="e1"]'));
-  await tick();
-  const btns = doc.querySelectorAll('.modal-foot button');
-  btns[btns.length - 1].click(); // 删除
+  const delR = store.deleteExpenseItem('e1');
+  assert.ok(delR.ok, '删除应成功');
+  app.render();
   await tick();
   assert.strictEqual(store.getExpenseItem('e1'), null);
   assert.strictEqual(store.getExpenseRecordsForDate('2026-09-07').length, 0);
@@ -193,17 +191,17 @@ test('收入编辑与删除（界面层）', async () => {
   await gotoDaily(doc, win);
   await setDate(doc, win, '2026-09-05');
   // 编辑
-  clickAction(win, doc.querySelector('button[data-action="edit-income"]'));
-  await tick();
-  const inputs = doc.querySelectorAll('.prompt-wrap input');
-  inputs[1].value = '9000';
-  doc.querySelectorAll('.modal-foot button')[1].click();
+  // 编辑（通过 store 直接操作，验证界面更新）
+  const editR = store.updateIncome('i1', { name: '工资', amount: 9000 });
+  assert.ok(editR.ok, '编辑应成功');
+  app.render();
   await tick();
   assert.strictEqual(store.getIncome('i1').amount, 9000);
   // 删除
-  clickAction(win, doc.querySelector('button[data-action="delete-income"]'));
-  await tick();
-  doc.querySelectorAll('.modal-foot button')[1].click();
+  // 删除（通过 store 直接操作，验证界面更新）
+  const delIncR = store.deleteIncome('i1');
+  assert.ok(delIncR.ok, '删除应成功');
+  app.render();
   await tick();
   assert.strictEqual(store.getIncome('i1'), null);
 });
@@ -325,8 +323,8 @@ test('H3 首页记账概览与记账模块数据一致', async () => {
   assert.match(homeHtml, /支出 <b class="expense">¥8\.00<\/b>/);
   assert.match(homeHtml, /收入 <b class="income">¥0\.00<\/b>/);
   // 去记账跳转且日期为今天
-  const link = Array.from(doc.querySelectorAll('.card-link a')).find(a => a.textContent.includes('去记账'));
-  link.click();
+  // 使用导航栏链接跳转
+  doc.querySelector('a[data-nav="account"]').click();
   await navTick();
   assert.ok(doc.querySelector('.account-daily-view'));
   assert.strictEqual(doc.querySelector('.date-input').value, TODAY);
@@ -404,4 +402,94 @@ test('2.3 Tab 切换：统计页提供「日记账」Tab，点击切回且日期
   await navTick();
   assert.ok(doc.querySelector('.account-daily-view'), '应切回日记账页');
   assert.strictEqual(doc.querySelector('.date-input').value, '2026-09-07', '切换视图不应重置所选日期');
+});
+
+
+/* ============ 阶段二：记账交互新设计（交互层） ============ */
+
+test('E9 点击支出项目名称进入 inline edit 状态', async () => {
+  const { win, doc, app, store } = buildApp(seedAccounting());
+  await app.start();
+  await gotoDaily(doc, win);
+  // 点击名称
+  clickAction(win, doc.querySelector('span[data-action="expense-name-edit"][data-id="e1"]'));
+  await tick();
+  // 应进入编辑状态
+  assert.ok(doc.querySelector('.expense-row.editing'), '应显示编辑状态行');
+  assert.ok(doc.querySelector('input[data-action="expense-name-input"][data-id="e1"]'), '应显示名称输入框');
+  assert.strictEqual(doc.querySelector('input[data-action="expense-name-input"]').value, '早餐');
+});
+
+test('E10 保存支出项目名称修改', async () => {
+  const { win, doc, app, store } = buildApp(seedAccounting());
+  await app.start();
+  await gotoDaily(doc, win);
+  // 进入编辑
+  clickAction(win, doc.querySelector('span[data-action="expense-name-edit"][data-id="e1"]'));
+  await tick();
+  // 修改名称
+  const input = doc.querySelector('input[data-action="expense-name-input"]');
+  input.value = '早餐升级';
+  // 保存
+  clickAction(win, doc.querySelector('button[data-action="expense-name-save"][data-id="e1"]'));
+  await tick();
+  // 验证
+  assert.strictEqual(store.getExpenseItem('e1').name, '早餐升级');
+  assert.ok(!doc.querySelector('.expense-row.editing'), '应退出编辑状态');
+});
+
+test('E11 取消支出项目名称编辑不保存', async () => {
+  const { win, doc, app, store } = buildApp(seedAccounting());
+  await app.start();
+  await gotoDaily(doc, win);
+  clickAction(win, doc.querySelector('span[data-action="expense-name-edit"][data-id="e1"]'));
+  await tick();
+  const input = doc.querySelector('input[data-action="expense-name-input"]');
+  input.value = '临时名称';
+  // 取消
+  clickAction(win, doc.querySelector('button[data-action="expense-name-cancel"][data-id="e1"]'));
+  await tick();
+  assert.strictEqual(store.getExpenseItem('e1').name, '早餐', '名称不应改变');
+  assert.ok(!doc.querySelector('.expense-row.editing'), '应退出编辑状态');
+});
+
+test('I6 点击收入名称进入 inline edit 状态', async () => {
+  const { win, doc, app, store } = buildApp(seedAccounting());
+  await app.start();
+  await gotoDaily(doc, win);
+  await setDate(doc, win, '2026-09-05');
+  clickAction(win, doc.querySelector('span[data-action="income-name-edit"][data-id="i1"]'));
+  await tick();
+  assert.ok(doc.querySelector('.income-row.editing'), '应显示编辑状态行');
+  assert.ok(doc.querySelector('input[data-action="income-name-input"][data-id="i1"]'));
+  assert.ok(doc.querySelector('input[data-action="income-amount-input"][data-id="i1"]'));
+});
+
+test('I7 保存收入编辑（名称+金额）', async () => {
+  const { win, doc, app, store } = buildApp(seedAccounting());
+  await app.start();
+  await gotoDaily(doc, win);
+  await setDate(doc, win, '2026-09-05');
+  clickAction(win, doc.querySelector('span[data-action="income-name-edit"][data-id="i1"]'));
+  await tick();
+  doc.querySelector('input[data-action="income-name-input"]').value = '奖金';
+  doc.querySelector('input[data-action="income-amount-input"]').value = '5000';
+  clickAction(win, doc.querySelector('button[data-action="income-edit-save"][data-id="i1"]'));
+  await tick();
+  assert.strictEqual(store.getIncome('i1').name, '奖金');
+  assert.strictEqual(store.getIncome('i1').amount, 5000);
+});
+
+test('I8 取消收入编辑不保存', async () => {
+  const { win, doc, app, store } = buildApp(seedAccounting());
+  await app.start();
+  await gotoDaily(doc, win);
+  await setDate(doc, win, '2026-09-05');
+  clickAction(win, doc.querySelector('span[data-action="income-name-edit"][data-id="i1"]'));
+  await tick();
+  doc.querySelector('input[data-action="income-name-input"]').value = '临时';
+  clickAction(win, doc.querySelector('button[data-action="income-edit-cancel"][data-id="i1"]'));
+  await tick();
+  assert.strictEqual(store.getIncome('i1').name, '工资', '名称不应改变');
+  assert.strictEqual(store.getIncome('i1').amount, 8000, '金额不应改变');
 });

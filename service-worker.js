@@ -4,7 +4,7 @@
  *       fetch 采用缓存优先，未命中则走网络并写入缓存。
  * 升级代码后请递增 CACHE_VERSION，旧缓存会在 activate 时被清理。
  */
-var CACHE_VERSION = 'life-assistant-v1';
+var CACHE_VERSION = 'life-assistant-v2';
 var CACHE_NAME = 'life-assistant-' + CACHE_VERSION;
 
 /** 应用外壳：首次安装时全部缓存，确保离线可用 */

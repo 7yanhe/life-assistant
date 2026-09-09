@@ -384,6 +384,44 @@
     return { ok: true };
   };
 
+  /* ============ 首页月历摘要 ============ */
+
+  /**
+   * 某月日历摘要：返回该月每天的打卡/记账概览，供首页月历格子使用。
+   * 返回 { "YYYY-MM-DD": { checkin: {total, done}, expense, income } }
+   */
+  Store.prototype.monthCalendarSummary = function (monthStr) {
+    var self = this;
+    var range = D.getMonthRange(monthStr + '-01');
+    if (!range) return {};
+    var result = {};
+    var cursor = range.start;
+    while (D.isSameOrBefore(cursor, range.end)) {
+      result[cursor] = { checkin: { total: 0, done: 0 }, expense: 0, income: 0 };
+      cursor = D.addDays(cursor, 1);
+    }
+    this.listPlans().forEach(function (p) {
+      var start = D.isAfter(p.createdAt, range.start) ? p.createdAt : range.start;
+      var end = D.isBefore(self.todayFn(), range.end) ? self.todayFn() : range.end;
+      if (D.isAfter(start, end)) return;
+      var c = start;
+      while (D.isSameOrBefore(c, end)) {
+        if (result[c]) result[c].checkin.total += 1;
+        c = D.addDays(c, 1);
+      }
+    });
+    this.data.checkRecords.forEach(function (r) {
+      if (result[r.date] && r.completed) result[r.date].checkin.done += 1;
+    });
+    this.data.expenseRecords.forEach(function (r) {
+      if (result[r.date]) result[r.date].expense += r.amount;
+    });
+    this.data.incomeRecords.forEach(function (r) {
+      if (result[r.date]) result[r.date].income += r.amount;
+    });
+    return result;
+  };
+
   /* ============ 记账 · 当日小结 ============ */
 
   /**

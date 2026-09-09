@@ -111,7 +111,8 @@ test('G5 运行时：断网环境下启动并遍历全部视图，零网络请�
   assert.ok(win.LifeApp && win.LifeApp.App, '应用应成功引导');
   const appEl = doc.getElementById('app');
   assert.ok(appEl.innerHTML.length > 100, '首页应完成渲染');
-  assert.match(appEl.innerHTML, /今日打卡/, '首页应含今日打卡');
+  assert.match(appEl.innerHTML, /cal-grid/, '首页应含日历网格');
+  assert.match(appEl.innerHTML, /📋 打卡/, '首页应含打卡区域');
 
   // 依次访问全部 5 个视图
   const routes = ['#/', '#/checkin', '#/account/daily', '#/account/stats'];

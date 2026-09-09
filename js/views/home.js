@@ -1,12 +1,16 @@
 /**
- * views/home.js —— 首页总览视图（UMD，纯渲染函数）
+ * views/home.js —— 首页日历视图（UMD，纯渲染函数）
+ * 参考真我手机日历风格：月份标题 + 7列月历 + 蓝色今天高亮 + 圆点标记 + 底部今日详情
  * 输入 state：
  * {
  *   today: "YYYY-MM-DD",
+ *   month: "YYYY-MM",
+ *   selectedDate: "YYYY-MM-DD",
+ *   calendar: { "YYYY-MM-DD": { checkin: {total, done}, expense, income } },
  *   plans: [{ id, name, completedToday }],
  *   summary: { totalExpense, totalIncome, balance, expenseRows: [{itemName, amount}], incomes: [{name, amount}] }
  * }
- * 返回 HTML 字符串。浏览器挂载 LifeApp.Views.Home；Node 测试 require 使用。
+ * 返回 HTML 字符串。
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -18,6 +22,56 @@
   }
 })(typeof self !== 'undefined' ? self : this, function (D, UI) {
   'use strict';
+
+  var WEEK_HEADERS = ['日', '一', '二', '三', '四', '五', '六'];
+
+  function renderDots(dayInfo) {
+    if (!dayInfo) return '';
+    var dots = [];
+    var ci = dayInfo.checkin || { total: 0, done: 0 };
+    if (ci.total > 0) {
+      var cls = ci.done >= ci.total ? 'dot-checkin-done' : 'dot-checkin-miss';
+      dots.push('<span class="cal-dot ' + cls + '"></span>');
+    }
+    if (dayInfo.expense > 0) dots.push('<span class="cal-dot dot-expense"></span>');
+    if (dayInfo.income > 0) dots.push('<span class="cal-dot dot-income"></span>');
+    if (!dots.length) return '';
+    return '<div class="cal-dots">' + dots.join('') + '</div>';
+  }
+
+  function renderCalendarGrid(state) {
+    var month = state.month || state.today.slice(0, 7);
+    var today = state.today;
+    var selected = state.selectedDate || today;
+    var calendar = state.calendar || {};
+    var weeks = D.buildMonthCalendar(month + '-01');
+    var html = '<div class="cal-grid">';
+    WEEK_HEADERS.forEach(function (w) {
+      html += '<div class="cal-weekhead">' + w + '</div>';
+    });
+    weeks.forEach(function (week) {
+      week.forEach(function (cell) {
+        var date = cell.date;
+        var day = Number(date.slice(8, 10));
+        var isToday = date === today;
+        var isSelected = date === selected;
+        var isFuture = D.isAfter(date, today);
+        var dayInfo = calendar[date];
+        var cls = 'cal-cell';
+        if (!cell.inMonth) cls += ' out';
+        if (isToday) cls += ' today';
+        if (isSelected) cls += ' selected';
+        if (isFuture) cls += ' future';
+        var numCls = isToday ? 'cal-num today-num' : 'cal-num';
+        html += '<div class="' + cls + '" data-action="home-date-select" data-date="' + date + '">' +
+          '<span class="' + numCls + '">' + day + '</span>' +
+          renderDots(dayInfo) +
+          '</div>';
+      });
+    });
+    html += '</div>';
+    return html;
+  }
 
   function renderCheckinList(plans) {
     if (!plans.length) {
@@ -59,6 +113,8 @@
 
   function render(state) {
     var today = state.today || D.today();
+    var month = state.month || today.slice(0, 7);
+    var selected = state.selectedDate || today;
     var plans = state.plans || [];
     var sum = state.summary || {};
     var expenseRows = sum.expenseRows || [];
@@ -68,27 +124,46 @@
     var balance = typeof sum.balance === 'number' ? sum.balance : 0;
     var doneCount = plans.filter(function (p) { return p.completedToday; }).length;
     var balanceCls = balance < 0 ? ' negative' : '';
+    var monthLabel = D.formatMonthCN(month + '-01');
+    var yearStr = month.slice(0, 4) + '年';
+    var selectedLabel = D.formatCN(selected);
+    var selectedWeek = D.weekdayCN(selected);
+    var isTodaySelected = selected === today;
+
     return '' +
       '<section class="home-view" data-view="home">' +
-      '  <header class="date-header">' +
-      '    <div class="date-big">' + D.formatCN(today) + '</div>' +
-      '    <div class="date-week">' + D.weekdayCN(today) + '</div>' +
-      '  </header>' +
-      '  <section class="card">' +
-      '    <div class="card-title">📋 今日打卡 <span class="count">已完成 ' + doneCount + ' / 共 ' + plans.length + '</span></div>' +
-      renderCheckinList(plans) +
-      '    <div class="card-link"><a href="#/checkin">查看全部打卡 →</a></div>' +
-      '  </section>' +
-      '  <section class="card">' +
-      '    <div class="card-title">💰 今日记账</div>' +
-      '    <div class="money-summary">' +
-      '      <span class="ms-item">支出 <b class="expense">' + UI.formatMoney(totalExpense) + '</b></span>' +
-      '      <span class="ms-item">收入 <b class="income">' + UI.formatMoney(totalIncome) + '</b></span>' +
-      '      <span class="ms-item">结余 <b class="balance' + balanceCls + '">' + UI.formatMoney(balance) + '</b></span>' +
+      '  <div class="cal-header">' +
+      '    <div class="cal-title">' +
+      '      <div class="cal-month">' + monthLabel.replace(yearStr, '') + '</div>' +
+      '      <div class="cal-year">' + yearStr + '</div>' +
       '    </div>' +
+      '    <div class="cal-nav">' +
+      '      <button class="cal-nav-btn" data-action="home-month-prev" aria-label="上个月">‹</button>' +
+      '      <button class="cal-today-btn" data-action="home-today">今天</button>' +
+      '      <button class="cal-nav-btn" data-action="home-month-next" aria-label="下个月">›</button>' +
+      '    </div>' +
+      '  </div>' +
+      renderCalendarGrid(state) +
+      '  <div class="home-detail">' +
+      '    <div class="detail-date">' +
+      '      <span class="detail-date-label">' + (isTodaySelected ? '今天 · ' : '') + selectedLabel + '</span>' +
+      '      <span class="detail-date-week">' + selectedWeek + '</span>' +
+      '    </div>' +
+      '    <div class="detail-section">' +
+      '      <div class="detail-section-title">📋 打卡 <span class="count">已完成 ' + doneCount + ' / 共 ' + plans.length + '</span></div>' +
+      renderCheckinList(plans) +
+      '    </div>' +
+      '    <div class="detail-section">' +
+      '      <div class="detail-section-title">💰 记账</div>' +
+      '      <div class="money-summary">' +
+      '        <span class="ms-item">支出 <b class="expense">' + UI.formatMoney(totalExpense) + '</b></span>' +
+      '        <span class="ms-item">收入 <b class="income">' + UI.formatMoney(totalIncome) + '</b></span>' +
+      '        <span class="ms-item">结余 <b class="balance' + balanceCls + '">' + UI.formatMoney(balance) + '</b></span>' +
+      '      </div>' +
       renderAccountList({ expenseRows: expenseRows, incomes: incomes }) +
-      '    <div class="card-link"><a href="#/account/daily">去记账 →</a></div>' +
-      '  </section>' +
+      '    </div>' +
+      '  </div>' +
+      '  <button class="fab" data-action="home-quick-add" aria-label="快速添加">＋</button>' +
       '</section>';
   }
 

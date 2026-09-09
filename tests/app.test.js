@@ -17,8 +17,11 @@ const HTML = `<!DOCTYPE html><html><head></head><body>
     <a href="#/account/daily" data-nav="account">记账</a>
   </div>
   <div class="nav-actions">
-    <button type="button" class="btn btn-small" data-action="export-backup">导出备份</button>
-    <button type="button" class="btn btn-small" data-action="import-backup">导入恢复</button>
+    <button type="button" class="btn btn-icon more-btn" data-action="nav-more" aria-label="更多操作">⋮</button>
+    <div class="nav-more-menu" data-role="nav-more-menu" hidden>
+      <button type="button" class="menu-item" data-action="export-backup">导出备份</button>
+      <button type="button" class="menu-item" data-action="import-backup">导入恢复</button>
+    </div>
     <input type="file" id="import-file" accept=".json,application/json" hidden>
   </div>
 </nav>
@@ -97,21 +100,21 @@ test('未知 hash 回退首页', async () => {
 test('H1 首页显示今天日期与星期', async () => {
   const { doc, app } = buildApp();
   await app.start();
-  assert.match(doc.querySelector('.date-big').textContent, /2026年9月9日/);
-  assert.strictEqual(doc.querySelector('.date-week').textContent, '星期三');
+  assert.match(doc.querySelector('.detail-date-label').textContent, /2026年9月9日/);
+  assert.strictEqual(doc.querySelector('.detail-date-week').textContent, '星期三');
 });
 
 test('C2/H2 首页快捷打卡：勾选立即保存并更新完成数，打卡页同步', async () => {
   const { win, doc, app, store, adapter } = buildApp(seedPlanOld());
   await app.start();
-  let count = doc.querySelector('.card-title .count').textContent;
+  let count = doc.querySelector('.detail-section-title .count').textContent;
   assert.strictEqual(count.trim(), '已完成 1 / 共 1');
   // 取消勾选
   const box = doc.querySelector('input[data-action="toggle-today"]');
   assert.ok(box.checked);
   clickAction(win, box);
   await navTick();
-  count = doc.querySelector('.card-title .count').textContent;
+  count = doc.querySelector('.detail-section-title .count').textContent;
   assert.strictEqual(count.trim(), '已完成 0 / 共 1');
   assert.strictEqual(store.todayStatus('plan_old'), false);
   // 即时保存：同底层存储新建 store（模拟刷新）状态保留
@@ -129,7 +132,7 @@ test('C2/H2 首页快捷打卡：勾选立即保存并更新完成数，打卡�
   doc.querySelector('a[data-nav="home"]').click();
   await navTick();
   assert.strictEqual(doc.querySelector('input[data-action="toggle-today"]').checked, true);
-  assert.match(doc.querySelector('.card-title .count').textContent, /已完成 1 \/ 共 1/);
+  assert.match(doc.querySelector('.detail-section-title .count').textContent, /已完成 1 \/ 共 1/);
 });
 
 test('H3 首页记账只读：显示今日收支但不含金额输入框', async () => {
@@ -146,11 +149,10 @@ test('H3 首页记账只读：显示今日收支但不含金额输入框', async
   assert.doesNotMatch(homeHtml, /id="inc-name"/);
 });
 
-test('H4 首页「去记账」跳转到日记账且日期为今天', async () => {
+test('H4 首页导航「记账」跳转到日记账且日期为今天', async () => {
   const { doc, app } = buildApp();
   await app.start();
-  const link = Array.from(doc.querySelectorAll('.card-link a')).find(a => a.textContent.includes('去记账'));
-  link.click();
+  doc.querySelector('a[data-nav="account"]').click();
   await navTick();
   assert.ok(doc.querySelector('.account-daily-view'));
   assert.strictEqual(doc.querySelector('.date-input').value, TODAY);
@@ -298,3 +300,53 @@ test('B4 导入格式校验：缺少必要字段拒绝导入', async () => {
   assert.ok(store.getPlan('plan_old'));
 });
 
+
+
+/* ============ 阶段三：导航栏更多菜单 ============ */
+
+test('N1 导航栏包含更多按钮 ⋮', async () => {
+  const { win, doc, app } = buildApp();
+  await app.start();
+  const moreBtn = doc.querySelector('button[data-action="nav-more"]');
+  assert.ok(moreBtn, '导航栏应包含更多按钮');
+  assert.match(moreBtn.textContent, /⋮/, '更多按钮应显示 ⋮');
+});
+
+test('N2 点击更多按钮显示下拉菜单', async () => {
+  const { win, doc, app } = buildApp();
+  await app.start();
+  const menu = doc.querySelector('[data-role="nav-more-menu"]');
+  assert.ok(menu, '应存在更多菜单容器');
+  assert.ok(menu.hasAttribute('hidden'), '初始应隐藏');
+  // 点击更多按钮
+  clickAction(win, doc.querySelector('button[data-action="nav-more"]'));
+  await tick();
+  assert.ok(!menu.hasAttribute('hidden'), '点击后应显示菜单');
+});
+
+test('N3 下拉菜单包含导出备份和导入恢复选项', async () => {
+  const { win, doc, app } = buildApp();
+  await app.start();
+  clickAction(win, doc.querySelector('button[data-action="nav-more"]'));
+  await tick();
+  const menu = doc.querySelector('[data-role="nav-more-menu"]');
+  assert.ok(menu.querySelector('button[data-action="export-backup"]'), '菜单应包含导出备份');
+  assert.ok(menu.querySelector('button[data-action="import-backup"]'), '菜单应包含导入恢复');
+  assert.match(menu.textContent, /导出备份/);
+  assert.match(menu.textContent, /导入恢复/);
+});
+
+test('N4 再次点击更多按钮隐藏菜单', async () => {
+  const { win, doc, app } = buildApp();
+  await app.start();
+  const moreBtn = doc.querySelector('button[data-action="nav-more"]');
+  const menu = doc.querySelector('[data-role="nav-more-menu"]');
+  // 第一次点击：显示
+  clickAction(win, moreBtn);
+  await tick();
+  assert.ok(!menu.hasAttribute('hidden'), '第一次点击后应显示');
+  // 第二次点击：隐藏
+  clickAction(win, moreBtn);
+  await tick();
+  assert.ok(menu.hasAttribute('hidden'), '第二次点击后应隐藏');
+});

@@ -71,7 +71,7 @@ test('C2 列表页勾选今日：状态保存并同步首页', async () => {
   doc.querySelector('a[data-nav="home"]').click();
   await navTick();
   assert.strictEqual(doc.querySelector('input[data-action="toggle-today"]').checked, false);
-  assert.match(doc.querySelector('.card-title .count').textContent, /已完成 0 \/ 共 1/);
+  assert.match(doc.querySelector('.detail-section-title .count').textContent, /已完成 0 \/ 共 1/);
 });
 
 /* ============ C3 补打卡 ============ */

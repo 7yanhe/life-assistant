@@ -56,12 +56,44 @@ test('H3 首页记账只读：展示金额与明细，无输入框', () => {
   assert.doesNotMatch(html, /<input/);
 });
 
-test('H4 首页跳转入口', () => {
+test('H4 首页日历视图结构', () => {
   const html = HomeView.render({ today: '2026-09-09', plans: [], summary: {} });
-  assert.match(html, /href="#\/checkin"/);
-  assert.match(html, /href="#\/account\/daily"/);
-  assert.match(html, /查看全部打卡/);
-  assert.match(html, /去记账/);
+  assert.match(html, /class="cal-month">9月/);
+  assert.match(html, /class="cal-year">2026年/);
+  assert.match(html, /data-action="home-month-prev"/);
+  assert.match(html, /data-action="home-month-next"/);
+  assert.match(html, /data-action="home-today"/);
+  assert.match(html, /class="cal-grid"/);
+  assert.match(html, /class="cal-weekhead">日</);
+  assert.match(html, /class="cal-weekhead">六</);
+  assert.match(html, /class="cal-cell today selected" data-action="home-date-select" data-date="2026-09-09"/);
+  assert.match(html, /class="cal-num today-num">9</);
+  assert.match(html, /class="cal-cell future" data-action="home-date-select" data-date="2026-09-10"/);
+  assert.match(html, /class="home-detail"/);
+  assert.match(html, /class="detail-date-label">今天 · 2026年9月9日/);
+  assert.match(html, /class="detail-date-week">星期三/);
+  assert.match(html, /📋 打卡/);
+  assert.match(html, /💰 记账/);
+  assert.match(html, /class="fab" data-action="home-quick-add"/);
+});
+
+test('H5 首页日历圆点标记：打卡完成/未完成/支出/收入', () => {
+  const html = HomeView.render({
+    today: '2026-09-09',
+    plans: [],
+    summary: {},
+    calendar: {
+      '2026-09-01': { checkin: { total: 3, done: 3 }, expense: 45, income: 0 },
+      '2026-09-02': { checkin: { total: 3, done: 1 }, expense: 0, income: 8000 },
+      '2026-09-03': { checkin: { total: 0, done: 0 }, expense: 20, income: 0 }
+    }
+  });
+  assert.match(html, /data-date="2026-09-01"[\s\S]*?dot-checkin-done/);
+  assert.match(html, /data-date="2026-09-01"[\s\S]*?dot-expense/);
+  assert.match(html, /data-date="2026-09-02"[\s\S]*?dot-checkin-miss/);
+  assert.match(html, /data-date="2026-09-02"[\s\S]*?dot-income/);
+  assert.match(html, /data-date="2026-09-03"[\s\S]*?dot-expense/);
+  assert.doesNotMatch(html, /data-date="2026-09-03"[\s\S]*?dot-checkin/);
 });
 
 test('G4 首页空状态', () => {
@@ -190,16 +222,16 @@ test('E1/E3 日记账：支出项目行 + 金额输入框（已填/未填）', (
   assert.match(html, /data-action="expense-amount" data-item-id="e1" data-date="2026-09-09"/);
   assert.match(html, /value="12"/); // 已填金额回显
   assert.match(html, /placeholder="未填写"/); // 未填金额占位
-  assert.match(html, /data-action="rename-expense" data-id="e1"/);
-  assert.match(html, /data-action="stop-expense" data-id="e1"/);
-  assert.match(html, /data-action="delete-expense" data-id="e1"/);
+  assert.match(html, /data-action="expense-name-edit" data-id="e1"/);
+  assert.match(html, /data-action="expense-more" data-id="e1"/);
+  assert.match(html, /class="name"[^>]*>早餐/);
 });
 
 test('I1/I2 日记账：收入行与录入表单', () => {
   const html = AccountDaily.render(DAILY_STATE);
   assert.match(html, />工资<\/span><span class="amount income">\+¥8000\.00<\/span>/);
-  assert.match(html, /data-action="edit-income" data-id="i1"/);
-  assert.match(html, /data-action="delete-income" data-id="i1"/);
+  assert.match(html, /data-action="income-name-edit" data-id="i1"/);
+  assert.match(html, /data-action="income-more" data-id="i1"/);
   assert.match(html, /id="inc-name"/);
   assert.match(html, /id="inc-amount"/);
   assert.match(html, /data-action="add-income"/);
@@ -210,6 +242,48 @@ test('日记账当日小结：支出/收入/结余', () => {
   assert.match(html, /支出 <b class="expense">¥12\.00<\/b>/);
   assert.match(html, /收入 <b class="income">¥8000\.00<\/b>/);
   assert.match(html, /结余 <b class="balance">¥7988\.00<\/b>/);
+});
+
+/* ============ 阶段二：记账交互新设计 ============ */
+
+test('E7 支出项目行：类别名称可点击编辑 + 更多按钮', () => {
+  const html = AccountDaily.render(DAILY_STATE);
+  // 类别名称可点击
+  assert.match(html, /data-action="expense-name-edit" data-id="e1"/);
+  assert.match(html, /class="name"[^>]*>早餐/);
+  // 金额输入框在中间
+  assert.match(html, /data-action="expense-amount" data-item-id="e1"/);
+  // 更多按钮在右边
+  assert.match(html, /data-action="expense-more" data-id="e1"/);
+  assert.match(html, /class="btn btn-icon more-btn"/);
+});
+
+test('E8 支出项目 inline edit 状态：名称输入框 + 保存/取消', () => {
+  const state = JSON.parse(JSON.stringify(DAILY_STATE));
+  state.editingExpenseId = 'e1';
+  const html = AccountDaily.render(state);
+  assert.match(html, /class="expense-row editing"/);
+  assert.match(html, /data-action="expense-name-input" data-id="e1"/);
+  assert.match(html, /value="早餐"/);
+  assert.match(html, /data-action="expense-name-save" data-id="e1"/);
+  assert.match(html, /data-action="expense-name-cancel" data-id="e1"/);
+});
+
+test('I4 收入行：名称可点击编辑 + 更多按钮', () => {
+  const html = AccountDaily.render(DAILY_STATE);
+  assert.match(html, /data-action="income-name-edit" data-id="i1"/);
+  assert.match(html, /data-action="income-more" data-id="i1"/);
+});
+
+test('I5 收入 inline edit 状态：名称+金额输入框 + 保存/取消', () => {
+  const state = JSON.parse(JSON.stringify(DAILY_STATE));
+  state.editingIncomeId = 'i1';
+  const html = AccountDaily.render(state);
+  assert.match(html, /class="income-row editing"/);
+  assert.match(html, /data-action="income-name-input" data-id="i1"/);
+  assert.match(html, /data-action="income-amount-input" data-id="i1"/);
+  assert.match(html, /data-action="income-edit-save" data-id="i1"/);
+  assert.match(html, /data-action="income-edit-cancel" data-id="i1"/);
 });
 
 test('G4 日记账空状态：无支出项目、无收入', () => {
