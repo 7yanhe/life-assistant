@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>种子数据（验收用，用完即删）</title>
+  <script src="js/dateutil.js"></script>
+  <script src="js/storage.js"></script>
+</head>
+<body>
+  <p>正在写入验收种子数据……</p>
+  <script>
+    (function () {
+      var data = {
+        plans: [
+          { id: 'p1', name: '早起', createdAt: '2026-09-09' },
+          { id: 'p2', name: '阅读', createdAt: '2026-09-01' }
+        ],
+        checkRecords: [
+          { planId: 'p1', date: '2026-09-09', completed: true },
+          { planId: 'p2', date: '2026-09-01', completed: true },
+          { planId: 'p2', date: '2026-09-02', completed: true },
+          { planId: 'p2', date: '2026-09-08', completed: true }
+        ],
+        expenseItems: [
+          { id: 'e1', name: '早餐', createdAt: '2026-09-01', stoppedAt: null },
+          { id: 'e2', name: '交通', createdAt: '2026-09-05', stoppedAt: null }
+        ],
+        expenseRecords: [
+          { itemId: 'e1', date: '2026-09-07', amount: 12 },
+          { itemId: 'e1', date: '2026-09-09', amount: 8 },
+          { itemId: 'e2', date: '2026-09-10', amount: 13 }
+        ],
+        incomeRecords: [
+          { id: 'i1', name: '工资', date: '2026-09-05', amount: 8000 },
+          { id: 'i2', name: '兼职', date: '2026-09-12', amount: 500 }
+        ],
+        meta: { version: '1.0', lastModified: '2026-09-09T00:00:00.000Z' }
+      };
+      var adapter = LifeApp.Storage.pickBrowserAdapter();
+      adapter.save(data).then(function () {
+        document.body.textContent = '种子数据写入完成，跳转首页…';
+        setTimeout(function () { location.href = 'index.html'; }, 300);
+      }).catch(function (e) {
+        document.body.textContent = '写入失败: ' + (e && e.message || e);
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2f6fed">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="生活助手">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>生活助手</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="topnav" aria-label="主导航">
+    <div class="brand">生活助手</div>
+    <div class="nav-links">
+      <a href="#/" data-nav="home">首页</a>
+      <a href="#/checkin" data-nav="checkin">打卡</a>
+      <a href="#/account/daily" data-nav="account">记账</a>
+    </div>
+    <div class="nav-actions">
+      <button type="button" class="btn btn-small" data-action="export-backup">导出备份</button>
+      <button type="button" class="btn btn-small" data-action="import-backup">导入恢复</button>
+      <input type="file" id="import-file" accept=".json,application/json" hidden>
+    </div>
+  </nav>
+  <main id="app" class="app-container"></main>
+
+  <script src="js/dateutil.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/backup.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/views/home.js"></script>
+  <script src="js/views/checkin-list.js"></script>
+  <script src="js/views/checkin-detail.js"></script>
+  <script src="js/views/account-daily.js"></script>
+  <script src="js/views/account-stats.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    // 注册 Service Worker（PWA 离线支持），仅在 HTTPS 或 localhost 下生效
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('./service-worker.js').catch(function (e) {
+          console.warn('Service Worker 注册失败（不影响应用使用）:', e);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
